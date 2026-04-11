@@ -1,20 +1,20 @@
 {
-  "name": "nosana-eliza-agent",
+  "name": "sovereign-self",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Your digital identity. Your compute. Your rules.",
+  "workspaces": ["packages/*"],
   "scripts": {
-    "start": "elizaos start --character ./characters/agent.character.json",
-    "dev": "elizaos dev --character ./characters/agent.character.json"
+    "dev": "docker-compose up postgres -d && pnpm --filter agent dev & pnpm --filter api dev & pnpm --filter dashboard dev",
+    "dev:dashboard": "pnpm --filter dashboard dev",
+    "build": "pnpm --filter agent build && pnpm --filter api build && pnpm --filter dashboard build",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down",
+    "nosana:deploy": "nosana job post nosana/job.yaml",
+    "seed:demo": "tsx packages/api/src/scripts/seedDemoData.ts"
   },
-  "dependencies": {
-    "@elizaos/core": "^1.0.0",
-    "@elizaos/plugin-anthropic": "^1.5.12",
-    "@elizaos/plugin-bootstrap": "^1.0.0",
-    "@elizaos/plugin-openai": "^1.0.0"
-  },
-  "devDependencies": {
-    "@elizaos/cli": "^1.0.0",
-    "typescript": "^5.0.0"
+  "engines": {
+    "node": ">=22.0.0"
   }
 }

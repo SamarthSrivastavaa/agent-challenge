@@ -1,0 +1,30 @@
+{
+  "name": "@sovereign-self/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SovereignSelf ElizaOS v2 agent — reputation engine, crisis detector, and Nosana monitor",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@elizaos/core": "0.25.9",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.1",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.0"
+  }
+}

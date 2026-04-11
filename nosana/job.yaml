@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────────────────────────
+# SovereignSelf — Nosana GPU Deployment Configuration
+# ─────────────────────────────────────────────────────────────
+#
+# Deploy to Nosana:
+#   nosana job post nosana/job.yaml --market {MARKET_ID}
+#
+# Monitor:
+#   nosana job get {JOB_ID}
+#
+# Dashboard:
+#   https://dashboard.nosana.com/jobs/{JOB_ID}
+#
+# ─────────────────────────────────────────────────────────────
+
+version: '1'
+type: container
+meta:
+  trigger: push
+
+ops:
+  - id: sovereign-self
+    name: SovereignSelf AI Agent
+    type: container/run
+    image: your-dockerhub-username/sovereign-self-agent:latest
+    resources:
+      gpu: 1
+      cpu: 2
+      memory: 8Gi
+    env:
+      TWITTER_API_KEY: $TWITTER_API_KEY
+      TWITTER_API_SECRET: $TWITTER_API_SECRET
+      TWITTER_ACCESS_TOKEN: $TWITTER_ACCESS_TOKEN
+      TWITTER_ACCESS_SECRET: $TWITTER_ACCESS_SECRET
+      TWITTER_BEARER_TOKEN: $TWITTER_BEARER_TOKEN
+      TWITTER_USERNAME: $TWITTER_USERNAME
+      TELEGRAM_BOT_TOKEN: $TELEGRAM_BOT_TOKEN
+      TELEGRAM_CHAT_ID: $TELEGRAM_CHAT_ID
+      NOSANA_MODEL_ENDPOINT: $NOSANA_MODEL_ENDPOINT
+      NOSANA_JOB_ID: $NOSANA_JOB_ID
+      NOSANA_API_KEY: $NOSANA_API_KEY
+      DATABASE_URL: $DATABASE_URL
+      API_PORT: "3001"
+      API_WS_PORT: "3002"
+      NODE_ENV: production
+      LOG_LEVEL: info
+    ports:
+      - port: 3001
+        expose: true
+      - port: 3002
+        expose: true

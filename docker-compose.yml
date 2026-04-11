@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # PostgreSQL 16 — persistent storage for mentions, reputation,
+  # agent events, and node metrics
+  # ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sovereign-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sovereign
+      POSTGRES_PASSWORD: sovereign
+      POSTGRES_DB: sovereign
+    ports:
+      - "5432:5432"
+    volumes:
+      - sovereign_data:/var/lib/postgresql/data
+      - ./packages/api/src/db/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sovereign"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────
+  # ElizaOS Agent + Express API Server
+  # Runs both the agent and API in the same Node.js process
+  # for zero-latency event forwarding via the shared event bus
+  # ─────────────────────────────────────────────────────────────
+  agent:
+    build:
+      context: .
+      dockerfile: packages/agent/Dockerfile
+    container_name: sovereign-agent
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://sovereign:sovereign@postgres:5432/sovereign
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+
+  # ─────────────────────────────────────────────────────────────
+  # React Dashboard — built with Vite, served by nginx
+  # Proxies /api → agent:3001 and /ws → agent:3002
+  # ─────────────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: packages/dashboard/Dockerfile
+    container_name: sovereign-dashboard
+    depends_on:
+      - agent
+    ports:
+      - "8080:80"
+    environment:
+      VITE_API_URL: http://agent:3001
+      VITE_WS_URL: ws://agent:3002
+
+volumes:
+  sovereign_data:
