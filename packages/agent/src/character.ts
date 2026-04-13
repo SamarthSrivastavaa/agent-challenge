@@ -151,9 +151,8 @@ When writing briefs: be concise, data-driven, executive-summary style.`,
    * ElizaOS will route all model calls through this URL instead of its
    * built-in provider when this field is set.
    */
-  // For Ollama: use OLLAMA_SERVER_URL (no /v1 suffix — ElizaOS adds the path).
-  // For Nosana: set NOSANA_MODEL_ENDPOINT to the full proxy URL.
-  modelEndpointOverride: process.env.OLLAMA_SERVER_URL ?? process.env.NOSANA_MODEL_ENDPOINT,
+  // Use OPENAI_API_URL (Nosana-hosted Qwen) or fall back to Ollama for local dev.
+  modelEndpointOverride: process.env.OPENAI_API_URL ?? process.env.OLLAMA_SERVER_URL ?? process.env.NOSANA_MODEL_ENDPOINT,
 
   /**
    * Model settings — control context budget, temperature, and model selection.

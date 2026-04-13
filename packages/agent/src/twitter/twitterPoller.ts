@@ -27,19 +27,60 @@ let scraper: Scraper | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let isLoggedIn = false;
 
-/** Initialize the scraper and log in. Returns true on success. */
+/** Initialize the scraper — prefers cookie auth, falls back to username/password. */
 async function initScraper(): Promise<boolean> {
   const username = process.env.TWITTER_USERNAME;
   const password = process.env.TWITTER_PASSWORD;
   const email = process.env.TWITTER_EMAIL;
+  const cookies = process.env.TWITTER_COOKIES; // "auth_token=xxx; ct0=yyy"
 
-  if (!username || !password) {
-    log.warn("TWITTER_USERNAME or TWITTER_PASSWORD not set — Twitter polling disabled");
+  if (!username) {
+    log.warn("TWITTER_USERNAME not set — Twitter polling disabled");
+    return false;
+  }
+
+  scraper = new Scraper();
+
+  // ── Method 1: Cookie auth (preferred — avoids login blocks) ──
+  if (cookies) {
+    try {
+      log.info("Using cookie-based Twitter auth...");
+
+      // Parse "auth_token=xxx; ct0=yyy" into individual cookies
+      const cookieParts = cookies.split(";").map((c) => c.trim());
+      const authToken = cookieParts.find((c) => c.startsWith("auth_token="))?.split("=")[1];
+      const ct0 = cookieParts.find((c) => c.startsWith("ct0="))?.split("=")[1];
+
+      if (!authToken || !ct0) {
+        log.warn("TWITTER_COOKIES must contain both auth_token and ct0 — falling back to password login");
+      } else {
+        // Build cookie string that agent-twitter-client expects
+        const cookieString = `auth_token=${authToken}; ct0=${ct0}`;
+        scraper = scraper.withCookie(cookieString).withXCsrfToken(ct0);
+
+        // Verify session is valid by checking login status
+        const loggedIn = await scraper.isLoggedIn();
+        if (loggedIn) {
+          isLoggedIn = true;
+          log.info({ username }, "Twitter cookie auth successful");
+          return true;
+        } else {
+          log.warn("Cookie auth failed (expired?) — falling back to password login");
+        }
+      }
+    } catch (error) {
+      log.warn({ error: String(error) }, "Cookie auth error — falling back to password login");
+    }
+  }
+
+  // ── Method 2: Username/password login ──
+  if (!password) {
+    log.warn("No TWITTER_COOKIES and no TWITTER_PASSWORD — Twitter polling disabled");
     return false;
   }
 
   try {
-    log.info({ username }, "Logging in to Twitter...");
+    log.info({ username }, "Logging in to Twitter with username/password...");
     scraper = new Scraper();
     await scraper.login(username, password, email);
     isLoggedIn = true;

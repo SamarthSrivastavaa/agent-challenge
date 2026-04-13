@@ -1,53 +1,56 @@
 # ─────────────────────────────────────────────────────────────
-# SovereignSelf — Nosana GPU Deployment Configuration
+# SovereignSelf — Nosana Deployment Job Definition
 # ─────────────────────────────────────────────────────────────
 #
-# Deploy to Nosana:
-#   nosana job post nosana/job.yaml --market {MARKET_ID}
+# Deploy via dashboard:
+#   https://deploy.nosana.com
 #
-# Monitor:
-#   nosana job get {JOB_ID}
-#
-# Dashboard:
-#   https://dashboard.nosana.com/jobs/{JOB_ID}
-#
+# Exposes:
+#   :3001 — REST API  (health, mentions, reputation, events)
+#   :3002 — WebSocket (real-time feed for dashboard)
 # ─────────────────────────────────────────────────────────────
 
-version: '1'
+version: "0.1"
 type: container
+
 meta:
-  trigger: push
+  trigger: dashboard
+  system_requirements:
+    required_vram: 0   # Agent only — model is an external hosted endpoint
 
 ops:
-  - id: sovereign-self
-    name: SovereignSelf AI Agent
+  - id: sovereign-self-agent
     type: container/run
-    image: your-dockerhub-username/sovereign-self-agent:latest
-    resources:
-      gpu: 1
-      cpu: 2
-      memory: 8Gi
-    env:
-      TWITTER_API_KEY: $TWITTER_API_KEY
-      TWITTER_API_SECRET_KEY: $TWITTER_API_SECRET_KEY
-      TWITTER_ACCESS_TOKEN: $TWITTER_ACCESS_TOKEN
-      TWITTER_ACCESS_TOKEN_SECRET: $TWITTER_ACCESS_TOKEN_SECRET
-      TWITTER_BEARER_TOKEN: $TWITTER_BEARER_TOKEN
-      TWITTER_USERNAME: $TWITTER_USERNAME
-      TWITTER_PASSWORD: $TWITTER_PASSWORD
-      TWITTER_EMAIL: $TWITTER_EMAIL
-      TELEGRAM_BOT_TOKEN: $TELEGRAM_BOT_TOKEN
-      TELEGRAM_CHAT_ID: $TELEGRAM_CHAT_ID
-      NOSANA_MODEL_ENDPOINT: $NOSANA_MODEL_ENDPOINT
-      NOSANA_JOB_ID: $NOSANA_JOB_ID
-      NOSANA_API_KEY: $NOSANA_API_KEY
-      DATABASE_URL: $DATABASE_URL
-      API_PORT: "3001"
-      API_WS_PORT: "3002"
-      NODE_ENV: production
-      LOG_LEVEL: info
-    ports:
-      - port: 3001
-        expose: true
-      - port: 3002
-        expose: true
+    args:
+      image: docker.io/celestial2404/sovereign-self:latest
+      gpu: false
+      expose: 3001
+      env:
+        # ── Database (get free PostgreSQL from neon.tech) ─────
+        DATABASE_URL: "postgres://user:pass@ep-xxx.neon.tech/neondb?sslmode=require"
+
+        # ── Nosana-hosted Qwen model (from challenge .env.example) ──
+        OPENAI_API_KEY: "nosana"
+        OPENAI_API_URL: "https://5i8frj7ann99bbw9gzpprvzj2esugg39hxbb4unypskq.node.k8s.prd.nos.ci/v1"
+        MODEL_NAME: "Qwen3.5-9B-FP8"
+        NOSANA_MODEL_ENDPOINT: "https://5i8frj7ann99bbw9gzpprvzj2esugg39hxbb4unypskq.node.k8s.prd.nos.ci/v1"
+        NOSANA_API_KEY: "nosana"
+
+        # ── Embedding model (from challenge .env.example) ─────
+        OPENAI_EMBEDDING_URL: "https://4yiccatpyxx773jtewo5ccwhw1s2hezq5pehndb6fcfq.node.k8s.prd.nos.ci/v1"
+        OPENAI_EMBEDDING_API_KEY: "nosana"
+        OPENAI_EMBEDDING_MODEL: "Qwen3-Embedding-0.6B"
+        OPENAI_EMBEDDING_DIMENSIONS: "1024"
+
+        # ── ElizaOS provider ──────────────────────────────────
+        ELIZA_MODEL_PROVIDER: "openai"
+
+        # ── Twitter (optional) ────────────────────────────────
+        TWITTER_USERNAME: "SendX_AI"
+
+        # ── Server ports ─────────────────────────────────────
+        # WS shares port 3001 with REST (Nosana exposes single port)
+        API_PORT: "3001"
+        AGENT_HEALTH_PORT: "3099"
+        NODE_ENV: "production"
+        LOG_LEVEL: "info"

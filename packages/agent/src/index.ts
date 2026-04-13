@@ -19,7 +19,7 @@ import { reputationPlugin } from "./plugins/reputation/index.js";
 import { crisisPlugin } from "./plugins/crisis/index.js";
 import { nosanaMonitorPlugin } from "./plugins/nosana-monitor/index.js";
 import { startNosanaPolling, stopNosanaPolling } from "./plugins/nosana-monitor/providers/nosanaStatus.js";
-import { startTwitterPolling, stopTwitterPolling } from "./twitter/twitterPoller.js";
+// import { startTwitterPolling, stopTwitterPolling } from "./twitter/twitterPoller.js";
 
 // ─────────────────────────────────────────────────────────────
 // SovereignSelf Agent — Main Entrypoint
@@ -285,10 +285,14 @@ async function main(): Promise<void> {
   // Every 30 seconds: Nosana node metrics polling (handled by the polling function)
   startNosanaPolling();
 
+  // Twitter mention polling disabled — using seed data
+  // void startTwitterPolling();
+
   log.info("Scheduled tasks registered:");
   log.info("  → Heartbeat: every 60s");
   log.info("  → Weekly brief: Sunday 08:00 UTC");
   log.info("  → Nosana metrics: every 30s");
+  log.info("  → Twitter mentions: disabled (seed data mode)");
 
   // ── 9. Start the HTTP health check server ──
   // Use a separate port (3099) to avoid conflicting with the API server on API_PORT.
@@ -305,6 +309,7 @@ async function main(): Promise<void> {
   const shutdown = async (): Promise<void> => {
     log.info("Shutting down SovereignSelf agent...");
     stopNosanaPolling();
+    // stopTwitterPolling();
     process.exit(0);
   };
 

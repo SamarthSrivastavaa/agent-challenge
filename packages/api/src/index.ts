@@ -34,7 +34,6 @@ import { createEventBroadcaster, broadcast } from "./ws/eventBroadcaster.js";
 const log = pino({ name: "sovereign-api" });
 
 const API_PORT = parseInt(process.env.API_PORT ?? "3001", 10);
-const WS_PORT = parseInt(process.env.API_WS_PORT ?? "3002", 10);
 
 async function main(): Promise<void> {
   // ── Database pool ──
@@ -109,13 +108,13 @@ async function main(): Promise<void> {
   // Error handler (must be last middleware)
   app.use(errorHandler);
 
-  // ── Start Express server ──
-  app.listen(API_PORT, () => {
+  // ── Start HTTP server + attach WebSocket to the same port ──
+  // Nosana exposes a single port, so WS and REST must share port 3001.
+  const httpServer = app.listen(API_PORT, () => {
     log.info({ port: API_PORT }, "API server listening");
   });
 
-  // ── WebSocket server ──
-  const wss = createEventBroadcaster(WS_PORT, pool);
+  const wss = createEventBroadcaster(httpServer, pool);
 
   // ── Subscribe event bus → WebSocket broadcast ──
   // Import the shared event bus from the agent package.
@@ -159,7 +158,7 @@ async function main(): Promise<void> {
   log.info("═══════════════════════════════════════════════════════");
   log.info(`  SovereignSelf API Server`);
   log.info(`  REST: http://localhost:${API_PORT}`);
-  log.info(`  WS:   ws://localhost:${WS_PORT}`);
+  log.info(`  WS:   ws://localhost:${API_PORT}  (shared port)`);
   log.info("═══════════════════════════════════════════════════════");
 }
 

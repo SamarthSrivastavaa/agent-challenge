@@ -1,63 +1,50 @@
 # ─────────────────────────────────────────────────────────────
-# SovereignSelf Agent — Multi-stage Dockerfile
-# Stage 1: Build TypeScript with pnpm
-# Stage 2: Minimal production runtime
+# SovereignSelf — Production Dockerfile
+# Uses Debian Slim (glibc) for native ML binary compatibility
 # ─────────────────────────────────────────────────────────────
 
-# ── Stage 1: Builder ──
-FROM node:23-alpine AS builder
+FROM node:23-slim
 
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
+# Build tools for native modules + curl for healthcheck (using Debian's apt-get)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy workspace root files
-COPY package.json pnpm-lock.yaml* tsconfig.base.json ./
+ENV LOG_LEVEL=info
+
+# Copy workspace manifests + npmrc
+COPY package.json pnpm-workspace.yaml* tsconfig.base.json .npmrc* ./
 COPY packages/agent/package.json packages/agent/tsconfig.json ./packages/agent/
 COPY packages/api/package.json packages/api/tsconfig.json ./packages/api/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile || pnpm install
+# Run install. Since we are on glibc, pnpm will naturally pull the correct standard Linux binaries.
+# NODE_ENV must NOT be "production" or pnpm skips devDependencies (tsx).
+RUN NODE_ENV=development pnpm install
+
+ENV NODE_ENV=production
 
 # Copy source code
 COPY packages/agent/src ./packages/agent/src
 COPY packages/api/src ./packages/api/src
 
-# Build TypeScript
-RUN cd packages/agent && pnpm build || true
-RUN cd packages/api && pnpm build || true
+# Verify tsx is available
+RUN ls node_modules/.bin/tsx && echo "tsx found at node_modules/.bin/tsx"
 
-# ── Stage 2: Production Runtime ──
-FROM node:23-alpine AS runner
+# Copy startup script
+COPY packages/agent/start.sh ./start.sh
+RUN chmod +x ./start.sh
 
-RUN corepack enable && corepack prepare pnpm@9 --activate
+EXPOSE 3001 3002 3099
 
-WORKDIR /app
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -sf http://localhost:3001/health || exit 1
 
-ENV NODE_ENV=production
-
-# Copy workspace config
-COPY package.json pnpm-lock.yaml* tsconfig.base.json ./
-COPY packages/agent/package.json packages/agent/tsconfig.json ./packages/agent/
-COPY packages/api/package.json packages/api/tsconfig.json ./packages/api/
-
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod || pnpm install --prod
-
-# Copy built files from builder
-COPY --from=builder /app/packages/agent/dist ./packages/agent/dist
-COPY --from=builder /app/packages/api/dist ./packages/api/dist
-
-# Copy source files (needed for tsx in case dist doesn't exist)
-COPY packages/agent/src ./packages/agent/src
-COPY packages/api/src ./packages/api/src
-
-# Don't run as root
-USER node
-
-EXPOSE 3001 3002
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3001/health || exit 1
-
-CMD ["node", "packages/agent/dist/index.js"]
+CMD ["bash", "./start.sh"]
