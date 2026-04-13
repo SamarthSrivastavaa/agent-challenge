@@ -20,7 +20,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy package manifest and install dependencies
-COPY package.json ./
+COPY package.json bun.lock* pnpm-lock.yaml* ./
 RUN pnpm install
 
 # Copy all source files

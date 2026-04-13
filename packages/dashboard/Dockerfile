@@ -12,7 +12,7 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
 # Copy workspace root files
-COPY pnpm-workspace.yaml package.json ./
+COPY package.json pnpm-lock.yaml* ./
 COPY packages/dashboard/package.json ./packages/dashboard/
 
 # Install dependencies

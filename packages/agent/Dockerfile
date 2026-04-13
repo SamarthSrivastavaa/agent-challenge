@@ -12,7 +12,7 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
 # Copy workspace root files
-COPY pnpm-workspace.yaml package.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml* tsconfig.base.json ./
 COPY packages/agent/package.json packages/agent/tsconfig.json ./packages/agent/
 COPY packages/api/package.json packages/api/tsconfig.json ./packages/api/
 
@@ -37,7 +37,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Copy workspace config
-COPY pnpm-workspace.yaml package.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml* tsconfig.base.json ./
 COPY packages/agent/package.json packages/agent/tsconfig.json ./packages/agent/
 COPY packages/api/package.json packages/api/tsconfig.json ./packages/api/
 

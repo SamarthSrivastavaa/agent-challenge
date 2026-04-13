@@ -1,24 +1,24 @@
+import type React from "react";
 import { Activity, AtSign, BarChart3, Cpu, Settings } from "lucide-react";
 import { useAgentStore } from "../../stores/agentStore";
 import { StatusDot } from "../ui/StatusDot";
 
-const NAV_ITEMS = [
+type ViewId = "dashboard" | "mentions" | "reputation" | "node" | "settings";
+
+const NAV_ITEMS: { label: string; icon: React.ElementType; id: ViewId }[] = [
   { label: "Dashboard", icon: Activity, id: "dashboard" },
   { label: "Mentions", icon: AtSign, id: "mentions" },
   { label: "Reputation", icon: BarChart3, id: "reputation" },
   { label: "Node", icon: Cpu, id: "node" },
   { label: "Settings", icon: Settings, id: "settings" },
-] as const;
+];
 
-/**
- * Sidebar — left navigation panel.
- *
- * - Logo: "⬡ SOVEREIGN" in JetBrains Mono, purple
- * - Nav links with icons
- * - Bottom: Nosana node status indicator with pulsing dot
- * - Solid #111118 background, no gradients
- */
-export function Sidebar() {
+interface SidebarProps {
+  activeView: ViewId;
+  onNavigate: (view: ViewId) => void;
+}
+
+export function Sidebar({ activeView, onNavigate }: SidebarProps) {
   const nodeStatus = useAgentStore((s) => s.nodeStatus);
   const agentStatus = useAgentStore((s) => s.agentStatus);
 
@@ -47,8 +47,12 @@ export function Sidebar() {
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
-            id={`nav-${item.id}`}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sovereign-muted hover:text-sovereign-text hover:bg-sovereign-bg transition-colors"
+            onClick={() => onNavigate(item.id)}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+              activeView === item.id
+                ? "bg-sovereign-accent/10 text-sovereign-accent"
+                : "text-sovereign-muted hover:text-sovereign-text hover:bg-sovereign-bg"
+            }`}
           >
             <item.icon size={16} />
             <span>{item.label}</span>

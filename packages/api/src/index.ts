@@ -1,4 +1,17 @@
-import "dotenv/config";
+// Load .env from the monorepo root regardless of CWD
+import { config as loadEnv } from "dotenv";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+const __dotenvDir = dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: resolve(__dotenvDir, "../../../.env") });
+
+// ── Env confirmation ──
+console.log("[API] Env check:", {
+  DATABASE_URL: process.env.DATABASE_URL ? "✓ set" : "✗ MISSING",
+  NOSANA_MODEL_ENDPOINT: process.env.NOSANA_MODEL_ENDPOINT ? "✓ set" : "✗ MISSING",
+  API_PORT: process.env.API_PORT ?? "3001 (default)",
+});
+
 import express from "express";
 import pino from "pino";
 import { createDbPool } from "./db/client.js";

@@ -1,8 +1,13 @@
-import "dotenv/config";
+// Load .env from the monorepo root regardless of CWD
+import { config as loadEnv } from "dotenv";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+const __dotenvDir = dirname(fileURLToPath(import.meta.url));
+loadEnv({ path: resolve(__dotenvDir, "../../../.env") });
+
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import pg from "pg";
 import cron from "node-cron";
 import { AgentRuntime } from "@elizaos/core";
@@ -14,6 +19,7 @@ import { reputationPlugin } from "./plugins/reputation/index.js";
 import { crisisPlugin } from "./plugins/crisis/index.js";
 import { nosanaMonitorPlugin } from "./plugins/nosana-monitor/index.js";
 import { startNosanaPolling, stopNosanaPolling } from "./plugins/nosana-monitor/providers/nosanaStatus.js";
+import { startTwitterPolling, stopTwitterPolling } from "./twitter/twitterPoller.js";
 
 // ─────────────────────────────────────────────────────────────
 // SovereignSelf Agent — Main Entrypoint
@@ -148,26 +154,48 @@ async function main(): Promise<void> {
     log.info({ endpoint: modelEndpoint }, "ModelClient initialised");
   }
 
-  // ── 5. Create the ElizaOS AgentRuntime ──
+  // ── 5. Load the ElizaOS Twitter plugin (optional — graceful fallback) ──
+  // Dynamically imported so the agent starts even if credentials are missing.
+  let twitterPlugin: import("@elizaos/core").Plugin | null = null;
+  try {
+    const mod = await import("@elizaos/plugin-twitter");
+    twitterPlugin = (mod as Record<string, unknown>).twitterPlugin as import("@elizaos/core").Plugin
+      ?? (mod as Record<string, unknown>).default as import("@elizaos/core").Plugin
+      ?? null;
+    if (twitterPlugin) {
+      log.info("@elizaos/plugin-twitter loaded — mention polling active");
+    }
+  } catch (err) {
+    log.warn(
+      { error: String(err) },
+      "@elizaos/plugin-twitter not installed — Twitter mention polling disabled",
+    );
+  }
+
+  // ── 6. Create the ElizaOS AgentRuntime ──
   // ElizaOS AgentRuntime is the central orchestrator. It loads the
   // character, registers plugins (actions/providers/evaluators), and
   // manages the conversation loop and memory.
   log.info("Initialising ElizaOS AgentRuntime...");
+
+  const activePlugins = [
+    reputationPlugin,
+    crisisPlugin,
+    nosanaMonitorPlugin,
+    ...(twitterPlugin ? [twitterPlugin] : []),
+  ];
 
   try {
     const runtime = new AgentRuntime({
       // Character defines personality, system prompt, and model settings
       character: sovereignSelfCharacter,
 
-      // Custom plugins providing reputation, crisis, and node monitoring
-      plugins: [
-        reputationPlugin,
-        crisisPlugin,
-        nosanaMonitorPlugin,
-      ],
+      // Custom plugins providing reputation, crisis, node monitoring, and Twitter
+      plugins: activePlugins,
 
-      // Model endpoint override — routes all model calls through Nosana
-      modelProvider: modelEndpoint as string,
+      // Model provider name — must be a named ElizaOS provider (e.g. "ollama", "openai")
+      // The actual endpoint URL is set via OLLAMA_SERVER_URL or modelEndpointOverride in character.ts
+      modelProvider: process.env.ELIZA_MODEL_PROVIDER ?? "ollama",
 
       // Additional runtime settings
       token: modelApiKey,
@@ -175,11 +203,14 @@ async function main(): Promise<void> {
     } as Record<string, unknown>);
 
     log.info("ElizaOS AgentRuntime created with plugins:");
-    log.info("  → reputation-engine (3 actions, 1 provider, 1 evaluator)");
+    log.info("  → reputation-engine (3 actions, 1 provider, 2 evaluators)");
     log.info("  → crisis-detector (1 action, 1 evaluator)");
     log.info("  → nosana-monitor (1 provider)");
+    if (twitterPlugin) {
+      log.info("  → twitter (mention polling, reply drafting)");
+    }
 
-    // ── 6. Start the agent runtime ──
+    // ── 7. Start the agent runtime ──
     if (typeof (runtime as { start?: () => Promise<void> }).start === "function") {
       await (runtime as { start: () => Promise<void> }).start();
       log.info("ElizaOS runtime started");
@@ -191,7 +222,7 @@ async function main(): Promise<void> {
     );
   }
 
-  // ── 7. Set up cron-scheduled tasks ──
+  // ── 8. Set up cron-scheduled tasks ──
   log.info("Registering scheduled tasks...");
 
   // Every 60 seconds: log a heartbeat (mention polling is handled by the Twitter plugin)
@@ -259,13 +290,15 @@ async function main(): Promise<void> {
   log.info("  → Weekly brief: Sunday 08:00 UTC");
   log.info("  → Nosana metrics: every 30s");
 
-  // ── 8. Start the HTTP health check server ──
-  startHealthServer(apiPort);
+  // ── 9. Start the HTTP health check server ──
+  // Use a separate port (3099) to avoid conflicting with the API server on API_PORT.
+  const healthPort = parseInt(process.env.AGENT_HEALTH_PORT ?? "3099", 10);
+  startHealthServer(healthPort);
 
-  // ── 9. Log startup complete ──
+  // ── 10. Log startup complete ──
   log.info("═══════════════════════════════════════════════════════");
   log.info(`  SovereignSelf agent running on Nosana node ${nosanaJobId}`);
-  log.info(`  Health check: http://localhost:${apiPort}/health`);
+  log.info(`  Health check: http://localhost:${healthPort}/health`);
   log.info("═══════════════════════════════════════════════════════");
 
   // ── Graceful shutdown ──

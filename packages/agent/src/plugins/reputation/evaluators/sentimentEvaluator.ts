@@ -106,9 +106,12 @@ export const sentimentEvaluator: Evaluator = {
         await client.query(
           `UPDATE mentions
            SET sentiment = $1, sentiment_label = $2
-           WHERE sentiment IS NULL
-           ORDER BY ingested_at DESC
-           LIMIT 1`,
+           WHERE id = (
+             SELECT id FROM mentions
+             WHERE sentiment IS NULL
+             ORDER BY ingested_at DESC
+             LIMIT 1
+           )`,
           [sentiment.score, sentiment.label],
         );
       }
