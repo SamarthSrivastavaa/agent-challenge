@@ -22,7 +22,9 @@ export function useReputation() {
         if (current?.reputation) {
           setReputation(current.reputation);
         }
-        if (history?.history) {
+        // Only replace history if the DB actually has records — don't
+        // wipe mock/seed data with an empty array on a fresh deployment.
+        if (history?.history?.length > 0) {
           setReputationHistory(history.history);
         }
       } catch {

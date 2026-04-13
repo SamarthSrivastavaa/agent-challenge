@@ -1,158 +1,95 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAgentStore } from "../stores/agentStore";
+import { fetchEvents, fetchMentions, fetchNodeStatus } from "../lib/api";
 
-/** WebSocket connection status exposed to the TopBar. */
+/** Connection status exposed to the TopBar — mirrors the old WS interface. */
 export interface WsStatus {
   connected: boolean;
   lastPing: Date | null;
 }
 
+const POLL_EVENTS_MS   = 5_000;
+const POLL_NODE_MS     = 10_000;
+const POLL_MENTIONS_MS = 10_000;
+
 /**
- * useWebSocket — connects to the SovereignSelf WebSocket server,
- * implements exponential backoff reconnection (1s → 2s → 4s → 8s → max 30s),
- * and dispatches received messages to the Zustand store.
+ * useWebSocket — replaced with REST polling.
+ * Nosana's reverse proxy does not support WebSocket upgrades, so we poll
+ * the existing REST endpoints instead. Reputation data is handled separately
+ * by useReputation. Returns the same WsStatus shape so the TopBar indicator
+ * works (green = last poll succeeded).
  */
 export function useWebSocket(): WsStatus {
   const [connected, setConnected] = useState(false);
   const [lastPing, setLastPing] = useState<Date | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectDelay = useRef(1000);
+  const mountedRef = useRef(true);
 
-  const {
-    addEvent,
-    addMention,
-    setCrisis,
-    updateNodeStatus,
-    setReputation,
-    setEvents,
-    setTickerData,
-    setAgentStatus,
-  } = useAgentStore();
-
-  const connect = useCallback(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL ?? "ws://localhost:3002";
-
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setConnected(true);
-        reconnectDelay.current = 1000; // reset backoff on successful connect
-        setAgentStatus("monitoring");
-      };
-
-      ws.onmessage = (event) => {
-        setLastPing(new Date());
-
-        try {
-          const msg = JSON.parse(event.data as string) as {
-            type: string;
-            payload: Record<string, unknown>;
-          };
-
-          switch (msg.type) {
-            case "INIT":
-              // Initial state: array of recent events
-              if (Array.isArray((msg.payload as { events?: unknown[] }).events)) {
-                setEvents(
-                  (msg.payload as { events: Array<Record<string, unknown>> }).events as never[],
-                );
-              }
-              break;
-
-            case "MENTION":
-              addMention((msg.payload as { mention: never }).mention);
-              addEvent({
-                event_type: "MENTION",
-                event_source: "twitter",
-                payload: msg.payload,
-                created_at: new Date().toISOString(),
-              });
-              break;
-
-            case "CRISIS":
-              setCrisis({
-                mentions: (msg.payload as { mentions: never[] }).mentions,
-                severity: (msg.payload as { severity: "low" | "medium" | "high" }).severity,
-                detected_at: new Date().toISOString(),
-              });
-              addEvent({
-                event_type: "ALERT",
-                event_source: "crisis-detector",
-                payload: msg.payload,
-                created_at: new Date().toISOString(),
-              });
-              break;
-
-            case "DRAFT":
-              addEvent({
-                event_type: "ACTION",
-                event_source: "reputation-engine",
-                payload: msg.payload,
-                created_at: new Date().toISOString(),
-              });
-              break;
-
-            case "BRIEF":
-              setReputation(
-                (msg.payload as { brief: never }).brief,
-              );
-              addEvent({
-                event_type: "BRIEF",
-                event_source: "reputation-engine",
-                payload: msg.payload,
-                created_at: new Date().toISOString(),
-              });
-              break;
-
-            case "NODE":
-              updateNodeStatus(
-                (msg.payload as { metrics: never }).metrics,
-              );
-              break;
-
-            case "THOUGHT":
-              addEvent({
-                event_type: "THOUGHT",
-                event_source: (msg.payload as { source: string }).source ?? "agent",
-                payload: msg.payload,
-                created_at: new Date().toISOString(),
-              });
-              break;
-          }
-        } catch {
-          // Ignore malformed messages
-        }
-      };
-
-      ws.onclose = () => {
-        setConnected(false);
-        wsRef.current = null;
-
-        // Exponential backoff: 1s, 2s, 4s, 8s, ... max 30s
-        const delay = reconnectDelay.current;
-        reconnectDelay.current = Math.min(delay * 2, 30_000);
-
-        setTimeout(connect, delay);
-      };
-
-      ws.onerror = () => {
-        ws.close();
-      };
-    } catch {
-      // WebSocket constructor can throw if URL is invalid
-      setTimeout(connect, reconnectDelay.current);
-    }
-  }, [addEvent, addMention, setCrisis, updateNodeStatus, setReputation, setEvents, setTickerData, setAgentStatus]);
+  const { setEvents, setMentions, updateNodeStatus, setAgentStatus } = useAgentStore();
 
   useEffect(() => {
-    connect();
+    mountedRef.current = true;
+
+    // ── Initial load ──────────────────────────────────────────
+    async function initialLoad() {
+      try {
+        const [events, mentions, node] = await Promise.all([
+          fetchEvents(50),
+          fetchMentions(20),
+          fetchNodeStatus(),
+        ]);
+
+        if (!mountedRef.current) return;
+
+        if (Array.isArray(events))   setEvents(events);
+        if (Array.isArray(mentions)) setMentions(mentions);
+        if (node?.status)            updateNodeStatus(node);
+
+        setConnected(true);
+        setLastPing(new Date());
+        setAgentStatus("monitoring");
+      } catch {
+        if (mountedRef.current) setConnected(false);
+      }
+    }
+
+    void initialLoad();
+
+    // ── Poll events ───────────────────────────────────────────
+    const eventsTimer = setInterval(async () => {
+      try {
+        const events = await fetchEvents(50);
+        if (!mountedRef.current) return;
+        if (Array.isArray(events)) setEvents(events);
+        setConnected(true);
+        setLastPing(new Date());
+      } catch {
+        if (mountedRef.current) setConnected(false);
+      }
+    }, POLL_EVENTS_MS);
+
+    // ── Poll mentions ─────────────────────────────────────────
+    const mentionsTimer = setInterval(async () => {
+      try {
+        const mentions = await fetchMentions(20);
+        if (mountedRef.current && Array.isArray(mentions)) setMentions(mentions);
+      } catch { /* ignore */ }
+    }, POLL_MENTIONS_MS);
+
+    // ── Poll node status ──────────────────────────────────────
+    const nodeTimer = setInterval(async () => {
+      try {
+        const node = await fetchNodeStatus();
+        if (mountedRef.current && node?.status) updateNodeStatus(node);
+      } catch { /* ignore */ }
+    }, POLL_NODE_MS);
 
     return () => {
-      wsRef.current?.close();
+      mountedRef.current = false;
+      clearInterval(eventsTimer);
+      clearInterval(mentionsTimer);
+      clearInterval(nodeTimer);
     };
-  }, [connect]);
+  }, [setEvents, setMentions, updateNodeStatus, setAgentStatus]);
 
   return { connected, lastPing };
 }
