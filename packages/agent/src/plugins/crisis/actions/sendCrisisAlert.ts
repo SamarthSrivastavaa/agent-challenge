@@ -152,7 +152,6 @@ export const sendCrisisAlertAction: Action = {
         body: JSON.stringify({
           chat_id: chatId,
           text: telegramMessage,
-          parse_mode: "HTML",
         }),
       });
 
@@ -276,7 +275,6 @@ eventBus.on("crisis:detected", async ({ mentions, severity }) => {
         body: JSON.stringify({
           chat_id: chatId,
           text: telegramMessage,
-          parse_mode: "HTML",
         }),
       },
     );

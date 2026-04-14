@@ -47,11 +47,9 @@ export const fetchReputationScoreAction: Action = {
     _options?: Record<string, unknown>,
     callback?: HandlerCallback,
   ): Promise<void> => {
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
-      log.error("DATABASE_URL is not set");
-      return;
-    }
+    const dbUrl =
+      process.env.DATABASE_URL ??
+      "postgres://sovereign:sovereign@localhost:5432/sovereign";
 
     const client = new pg.Client({ connectionString: dbUrl });
 

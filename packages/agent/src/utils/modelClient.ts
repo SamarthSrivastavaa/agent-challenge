@@ -40,8 +40,9 @@ export class ModelTimeoutError extends Error {
 /** Retry delay schedule in milliseconds — three escalating attempts. */
 const RETRY_DELAYS = [500, 1500, 3000] as const;
 
-/** Maximum wall-clock time for a single model request. */
-const REQUEST_TIMEOUT_MS = 30_000;
+/** Maximum wall-clock time for a single model request.
+ *  Set to 120s to accommodate slow local models (deepseek-r1:8b with thinking). */
+const REQUEST_TIMEOUT_MS = 120_000;
 
 /**
  * Client for the Nosana-hosted Qwen3.5-27B-AWQ-4bit model.

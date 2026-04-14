@@ -51,15 +51,15 @@ export const generateWeeklyBriefAction: Action = {
     _options?: Record<string, unknown>,
     callback?: HandlerCallback,
   ): Promise<void> => {
-    const dbUrl = process.env.DATABASE_URL;
-    const endpoint = process.env.NOSANA_MODEL_ENDPOINT ?? process.env.OPENAI_API_URL;
-    const apiKey = process.env.NOSANA_API_KEY ?? process.env.OPENAI_API_KEY;
+    const dbUrl =
+      process.env.DATABASE_URL ??
+      "postgres://sovereign:sovereign@localhost:5432/sovereign";
+    const endpoint =
+      process.env.NOSANA_MODEL_ENDPOINT ??
+      process.env.OPENAI_API_URL ??
+      "http://localhost:11434/v1";
+    const apiKey = process.env.NOSANA_API_KEY ?? process.env.OPENAI_API_KEY ?? "ollama";
     const nodeId = process.env.NOSANA_JOB_ID ?? "local";
-
-    if (!dbUrl || !endpoint) {
-      log.error("DATABASE_URL or model endpoint not configured");
-      return;
-    }
 
     const modelClient = new ModelClient(endpoint, apiKey);
     const client = new pg.Client({ connectionString: dbUrl });

@@ -19,8 +19,10 @@ export async function createDbClient(): Promise<pg.Client> {
  * Preferred over individual clients for the API server.
  */
 export function createDbPool(): pg.Pool {
+  const connectionString = process.env.DATABASE_URL
+    ?? "postgres://sovereign:sovereign@localhost:5432/sovereign";
   return new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,

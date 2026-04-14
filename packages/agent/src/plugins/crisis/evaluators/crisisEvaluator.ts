@@ -138,7 +138,8 @@ export const crisisEvaluator: Evaluator = {
       await client.query(
         `UPDATE mentions
          SET is_crisis = TRUE
-         WHERE created_at >= $1 AND is_crisis = FALSE`,
+         WHERE created_at >= $1 AND is_crisis = FALSE
+           AND (sentiment_label = 'negative' OR sentiment < -0.1)`,
         [fifteenMinAgo.toISOString()],
       );
 

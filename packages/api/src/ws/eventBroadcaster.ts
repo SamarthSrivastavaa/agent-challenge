@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
+import type { Server as HttpServer } from "node:http";
 import type pg from "pg";
 import pino from "pino";
 
@@ -17,23 +18,24 @@ interface AugmentedWebSocket extends WebSocket {
 
 /**
  * Create and configure the WebSocket server for real-time event broadcasting.
+ * Attaches to an existing HTTP server so WS and REST share the same port.
  *
  * On connection:
  *   - Sends the last 20 agent_events as initial state
  *   - Subscribes to the event bus and broadcasts to all connected clients
  *   - Implements heartbeat ping every 25s
  *
- * @param port - Port to bind the WebSocket server to.
- * @param pool - PostgreSQL connection pool for fetching initial state.
+ * @param server - Existing HTTP server to attach the WebSocket server to.
+ * @param pool   - PostgreSQL connection pool for fetching initial state.
  * @returns The configured WebSocketServer instance.
  */
 export function createEventBroadcaster(
-  port: number,
+  server: HttpServer,
   pool: pg.Pool,
 ): WebSocketServer {
-  const wss = new WebSocketServer({ port });
+  const wss = new WebSocketServer({ server });
 
-  log.info({ port }, "WebSocket server listening");
+  log.info("WebSocket server attached to HTTP server");
 
   // ── Heartbeat: ping all clients every 25s, prune dead connections ──
   const heartbeat = setInterval(() => {

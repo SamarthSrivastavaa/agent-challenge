@@ -23,6 +23,13 @@ export const sovereignSelfCharacter: Character = {
   username: "sovereignself",
 
   /**
+   * Clients — tells ElizaOS which platform clients to activate.
+   * "twitter" loads the @elizaos/plugin-twitter client, which polls
+   * for mentions and routes them through the runtime message loop.
+   */
+  clients: ["twitter"],
+
+  /**
    * System prompt — injected at the start of every model call.
    * Defines the agent's identity, mission, and behavioural constraints.
    * ElizaOS prepends this to the context window before any user messages.
@@ -144,7 +151,8 @@ When writing briefs: be concise, data-driven, executive-summary style.`,
    * ElizaOS will route all model calls through this URL instead of its
    * built-in provider when this field is set.
    */
-  modelEndpointOverride: process.env.NOSANA_MODEL_ENDPOINT,
+  // Use OPENAI_API_URL (Nosana-hosted Qwen) or fall back to Ollama for local dev.
+  modelEndpointOverride: process.env.OPENAI_API_URL ?? process.env.OLLAMA_SERVER_URL ?? process.env.NOSANA_MODEL_ENDPOINT,
 
   /**
    * Model settings — control context budget, temperature, and model selection.
@@ -154,6 +162,30 @@ When writing briefs: be concise, data-driven, executive-summary style.`,
     model: process.env.MODEL_NAME ?? "qwen3.5-27b-awq-4bit",
     maxContextLength: 60000,
     temperature: 0.7,
+
+    // ── Twitter plugin settings ──
+    // Credentials (OAuth 1.0a — required by @elizaos/plugin-twitter)
+    TWITTER_USERNAME: process.env.TWITTER_USERNAME,
+    TWITTER_PASSWORD: process.env.TWITTER_PASSWORD,
+    TWITTER_EMAIL: process.env.TWITTER_EMAIL,
+    TWITTER_API_KEY: process.env.TWITTER_API_KEY,
+    TWITTER_API_SECRET_KEY: process.env.TWITTER_API_SECRET_KEY,
+    TWITTER_ACCESS_TOKEN: process.env.TWITTER_ACCESS_TOKEN,
+    TWITTER_ACCESS_TOKEN_SECRET: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+    TWITTER_BEARER_TOKEN: process.env.TWITTER_BEARER_TOKEN,
+
+    // Monitoring — poll mentions every 2 minutes
+    TWITTER_POLL_INTERVAL: 120,
+
+    // Posting — disabled by default; enable to let the agent auto-post
+    TWITTER_ENABLE_POST_GENERATION: false,
+    POST_IMMEDIATELY: false,
+
+    // Search — monitor mentions of the configured username
+    TWITTER_SEARCH_ENABLE: true,
+
+    // Do not auto-reply; agent drafts are reviewed in the dashboard first
+    TWITTER_DRY_RUN: true,
   } as Record<string, unknown>,
 };
 

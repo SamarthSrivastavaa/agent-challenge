@@ -4,6 +4,7 @@ import { draftReplyAction } from "./actions/draftReply.js";
 import { generateWeeklyBriefAction } from "./actions/generateWeeklyBrief.js";
 import { twitterContextProvider } from "./providers/twitterContext.js";
 import { sentimentEvaluator } from "./evaluators/sentimentEvaluator.js";
+import { mentionIngestorEvaluator } from "./evaluators/mentionIngestor.js";
 
 // ─────────────────────────────────────────────────────────────
 // Reputation Engine Plugin — ElizaOS custom plugin
@@ -55,10 +56,13 @@ export const reputationPlugin: Plugin = {
 
   /**
    * Evaluators are post-processing hooks that run after each message cycle.
+   * MENTION_INGESTOR captures Twitter plugin messages → mentions table.
    * SENTIMENT_EVALUATOR scores every processed message for sentiment
    * and updates the database, keeping the reputation scores current.
+   *
+   * Order matters: ingestor runs first so the row exists before scoring.
    */
-  evaluators: [sentimentEvaluator],
+  evaluators: [mentionIngestorEvaluator, sentimentEvaluator],
 };
 
 export default reputationPlugin;
